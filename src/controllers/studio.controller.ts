@@ -21,7 +21,11 @@ const createStudio = async (req: Request, res: Response) => {
             return;
         }
 
-        if (typeof price !== "number" || price <= 0) {
+        if (
+            typeof price !== "number" ||
+            !Number.isFinite(price) ||
+            price <= 0
+        ) {
             res.status(400).json({
                 success: false,
                 message: "Price must be a positive number.",
@@ -44,6 +48,8 @@ const createStudio = async (req: Request, res: Response) => {
             insertedId: result.insertedId,
         });
     } catch (error) {
+        console.error("Create studio error:", error);
+
         res.status(500).json({
             success: false,
             message: "Failed to create studio.",
@@ -64,6 +70,8 @@ export const getStudios = async (req: Request, res: Response) => {
             data: studios,
         });
     } catch (error) {
+        console.error("Get studios error:", error);
+
         res.status(500).json({
             success: false,
             message: "Failed to fetch studios.",
@@ -104,6 +112,8 @@ export const getStudioById = async (req: Request, res: Response) => {
             data: studio,
         });
     } catch (error) {
+        console.error("Get studio by ID error:", error);
+
         res.status(500).json({
             success: false,
             message: "Failed to fetch studio.",
@@ -141,7 +151,11 @@ export const updateStudio = async (req: Request, res: Response) => {
             return;
         }
 
-        if (typeof price !== "number" || price <= 0) {
+        if (
+            typeof price !== "number" ||
+            !Number.isFinite(price) ||
+            price <= 0
+        ) {
             res.status(400).json({
                 success: false,
                 message: "Price must be a positive number.",
@@ -176,6 +190,8 @@ export const updateStudio = async (req: Request, res: Response) => {
             message: "Studio updated successfully!",
         });
     } catch (error) {
+        console.error("Update studio error:", error);
+
         res.status(500).json({
             success: false,
             message: "Failed to update studio.",
@@ -214,6 +230,8 @@ export const deleteStudio = async (req: Request, res: Response) => {
             message: "Studio deleted successfully!",
         });
     } catch (error) {
+        console.error("Delete studio error:", error);
+
         res.status(500).json({
             success: false,
             message: "Failed to delete studio.",
