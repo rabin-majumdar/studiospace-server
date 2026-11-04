@@ -1,6 +1,6 @@
 import type { ObjectId } from "mongodb";
 
-export type BookingStatus = "pending" | "confirmed" | "cancelled";
+export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
 
 export interface Booking {
     _id?: ObjectId;

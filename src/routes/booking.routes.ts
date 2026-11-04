@@ -1,4 +1,5 @@
 import { Router } from "express";
+import authMiddleware from "../middlewares/auth.middleware.js";
 
 import {
     createBooking,
@@ -11,11 +12,11 @@ import {
 
 const router = Router();
 
-router.get("/", getBookings);
-router.get("/user/:userId", getMyBookings);
-router.get("/:id", getBookingById);
-router.post("/", createBooking);
-router.put("/:id", updateBookingStatus);
-router.patch("/:id/cancel", cancelBooking);
+router.get("/", authMiddleware, getBookings);
+router.get("/my-bookings", authMiddleware, getMyBookings);
+router.get("/:id", authMiddleware, getBookingById);
+router.post("/", authMiddleware, createBooking);
+router.put("/:id", authMiddleware, updateBookingStatus);
+router.patch("/:id/cancel", authMiddleware, cancelBooking);
 
 export default router;

@@ -5,6 +5,15 @@ import { ObjectId } from "mongodb";
 const createStudio = async (req: Request, res: Response) => {
     try {
         const { name, location, price } = req.body;
+        const ownerEmail = req.user?.email;
+
+        if (!ownerEmail) {
+            res.status(401).json({
+                success: false,
+                message: "Authentication required. Please log in.",
+            });
+            return;
+        }
 
         if (
             typeof name !== "string" ||
@@ -39,6 +48,7 @@ const createStudio = async (req: Request, res: Response) => {
             name: name.trim(),
             location: location.trim(),
             price,
+            ownerEmail,
             createdAt: new Date(),
         });
 
@@ -165,6 +175,36 @@ export const updateStudio = async (req: Request, res: Response) => {
 
         const db = await connectDB();
 
+        const userEmail = req.user?.email;
+
+        if (!userEmail) {
+            res.status(401).json({
+                success: false,
+                message: "Authentication required. Please log in.",
+            });
+            return;
+        }
+
+        const studio = await db.collection("studios").findOne({
+            _id: new ObjectId(id),
+        });
+
+        if (!studio) {
+            res.status(404).json({
+                success: false,
+                message: "Studio not found.",
+            });
+            return;
+        }
+
+        if (studio.ownerEmail !== userEmail) {
+            res.status(403).json({
+                success: false,
+                message: "You are not authorized to update this studio.",
+            });
+            return;
+        }
+
         const result = await db.collection("studios").updateOne(
             { _id: new ObjectId(id) },
             {
@@ -212,6 +252,36 @@ export const deleteStudio = async (req: Request, res: Response) => {
         }
 
         const db = await connectDB();
+
+        const userEmail = req.user?.email;
+
+        if (!userEmail) {
+            res.status(401).json({
+                success: false,
+                message: "Authentication required. Please log in.",
+            });
+            return;
+        }
+
+        const studio = await db.collection("studios").findOne({
+            _id: new ObjectId(id),
+        });
+
+        if (!studio) {
+            res.status(404).json({
+                success: false,
+                message: "Studio not found.",
+            });
+            return;
+        }
+
+        if (studio.ownerEmail !== userEmail) {
+            res.status(403).json({
+                success: false,
+                message: "You are not authorized to delete this studio.",
+            });
+            return;
+        }
 
         const result = await db.collection("studios").deleteOne({
             _id: new ObjectId(id),

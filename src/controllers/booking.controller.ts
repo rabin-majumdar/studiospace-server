@@ -6,7 +6,7 @@ import connectDB from "../config/db.js";
 import type { Booking, BookingStatus } from "../types/booking.js";
 
 const isValidBookingStatus = (status: unknown): status is BookingStatus => {
-    return ["pending", "confirmed", "cancelled"].includes(status as string);
+    return ["pending", "confirmed", "completed", "cancelled"].includes(status as string);
 };
 
 const isValidTime = (time: unknown): time is string => {
@@ -41,7 +41,8 @@ const isValidDate = (date: unknown): date is string => {
 
 export const createBooking = async (req: Request, res: Response) => {
     try {
-        const { studioId, userId, date, startTime, endTime } = req.body;
+        const { studioId, date, startTime, endTime } = req.body;
+        const userId = req.user?.userId;
 
         // Validate required fields
         if (
@@ -168,6 +169,15 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
+        const userId = req.user?.userId;
+
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                message: "Authentication required. Please log in.",
+            });
+            return;
+        }
 
         // Validate Booking ID
         if (typeof id !== "string" || !ObjectId.isValid(id)) {
@@ -203,9 +213,33 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
             return;
         }
 
+        // Find the studio
+        const studio = await db.collection("studios").findOne({
+            _id: booking.studioId,
+        });
+
+        if (!studio) {
+            res.status(404).json({
+                success: false,
+                message: "Studio not found.",
+            });
+            return;
+        }
+
+        // Verify Studio Ownership
+        if (studio.ownerEmail !== req.user?.email) {
+            res.status(403).json({
+                success: false,
+                message: "You are not authorized to update this booking status.",
+            });
+            return;
+        }
+
         if (
+            booking.status === "completed" ||
             booking.status === "cancelled" ||
-            (booking.status === "confirmed" && bookingStatus === "pending")
+            (booking.status === "confirmed" && bookingStatus === "pending") ||
+            (booking.status === "pending" && bookingStatus === "completed")
         ) {
             res.status(400).json({
                 success: false,
@@ -285,12 +319,36 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
 };
 
 export const getBookings = async (req: Request, res: Response) => {
+
+    const userId = req.user?.userId;
+    const userEmail = req.user?.email;
+
+    if (!userId || !userEmail) {
+        res.status(401).json({
+            success: false,
+            message: "Authentication required. Please log in.",
+        });
+        return;
+    }
+
     try {
         const db = await connectDB();
 
+        const ownedStudios = await db.collection("studios")
+            .find({ ownerEmail: userEmail })
+            .project({ _id: 1 })
+            .toArray();
+
+        const ownedStudioIds = ownedStudios.map((studio) => studio._id);
+
         const bookings = await db
             .collection<Booking>("bookings")
-            .find()
+            .find({
+                $or: [
+                    { userId },
+                    { studioId: { $in: ownedStudioIds } },
+                ],
+            })
             .toArray();
 
         res.status(200).json({
@@ -335,6 +393,41 @@ export const getBookingById = async (req: Request, res: Response) => {
             return;
         }
 
+        const userId = req.user?.userId;
+
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                message: "Authentication required. Please log in.",
+            });
+            return;
+        }
+
+        // Find the studio
+        const studio = await db.collection("studios").findOne({
+            _id: booking.studioId,
+        });
+
+        if (!studio) {
+            res.status(404).json({
+                success: false,
+                message: "Studio not found.",
+            });
+            return;
+        }
+
+        // Verify Booking Access
+        if (
+            booking.userId !== userId &&
+            studio.ownerEmail !== req.user?.email
+        ) {
+            res.status(403).json({
+                success: false,
+                message: "You are not authorized to view this booking.",
+            });
+            return;
+        }
+
         res.status(200).json({
             success: true,
             message: "Booking fetched successfully!",
@@ -352,7 +445,7 @@ export const getBookingById = async (req: Request, res: Response) => {
 
 export const getMyBookings = async (req: Request, res: Response) => {
     try {
-        const { userId } = req.params;
+        const userId = req.user?.userId;
 
         if (!userId || typeof userId !== "string") {
             res.status(400).json({
@@ -387,6 +480,15 @@ export const getMyBookings = async (req: Request, res: Response) => {
 export const cancelBooking = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
+        const userId = req.user?.userId;
+
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                message: "Authentication required. Please log in.",
+            });
+            return;
+        }
 
         if (typeof id !== "string" || !ObjectId.isValid(id)) {
             res.status(400).json({
@@ -401,6 +503,7 @@ export const cancelBooking = async (req: Request, res: Response) => {
         const result = await db.collection<Booking>("bookings").updateOne(
             {
                 _id: new ObjectId(id),
+                userId,
                 status: { $ne: "cancelled" },
             },
             {
